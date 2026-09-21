@@ -1,0 +1,58 @@
+{
+  "schema": 2,
+  "product": "TPI LAZARUS/UVON U-Boot 2024.04 SATA UEFI",
+  "vendor": "Tech Pro Industries LLC (TPI)",
+  "generated_utc": "2026-09-19T20:36:25.319609+00:00",
+  "deployment_status": "built-and-statically-verified; hardware-test-required-before-emmc",
+  "architecture": {
+    "unchanged": [
+      "BootROM",
+      "Forlinx DDR/early loader",
+      "Forlinx SPL",
+      "Forlinx TF-A BL31 payloads"
+    ],
+    "replaced": "BL33 and its U-Boot control DTB",
+    "bl33_load_entry": "0x00a00000"
+  },
+  "upstream": {
+    "project": "https://github.com/u-boot/u-boot",
+    "tag": "v2024.04",
+    "commit": "25049ad560826f7dc1c4740883b0016014a59789",
+    "defconfig_sha256": "6da77c4f359f77c97a84079b58fb5225f99f4ca3dddd839e3b7c1521dcfaf634"
+  },
+  "inputs": {
+    "vendor_fit_sha256": "dc2ba2ee4d1dca09dd2e5dd307a2f4609a7c2e477ad714ba20a5192b3e20e462",
+    "bl33_sha256": "dd9293199026edcacba949e0f73f2981202e5bd87082c4f524277a7e027162fc",
+    "control_dtb_sha256": "daf15b514e077a3dde7b4aabe67ad4f269a14fa3efbc39e1a720e7e7ef2b7568"
+  },
+  "outputs": {
+    "fit": {
+      "file": "TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.7.img",
+      "size": 4194304,
+      "sha256": "eab1e7bc9cb33094de70f3ed3f47b9df26e3d017f08fdd28da45b5a401ac8361"
+    },
+    "chainload": {
+      "file": "TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.7-chainload.bin",
+      "size": 977640,
+      "sha256": "30b9943bb0320ab23c0fbd4b4cc9194df746339db8a59b1e24bfb1ac7e24f9f6"
+    }
+  },
+  "packed_component_sha256": {
+    "u-boot": "dd9293199026edcacba949e0f73f2981202e5bd87082c4f524277a7e027162fc",
+    "atf-1": "b5946ac63df8fb3569407a75cf2f6aa396551ba011e1a84bec654dc9982ba063",
+    "atf-2": "a9a1e63bef11a6776a9670708fe78211ddcc437cc4ab145e1cfef77cea8607e4",
+    "atf-3": "2f91089eb714c78d9fb81f005859beda7f1709e04a858e4db732cb8f9800e727",
+    "atf-4": "b8dca786b41f8beb12e2434c1698e344931777099aa0e5729b76fcda2f781907",
+    "atf-5": "86ef8857484c5cd51363c3dd8338818c7bdc687e48c57897578781f10270a515",
+    "atf-6": "0b2b146c608fb46195852ab008f179c3e4ea399d38af589691d72705fbfde654",
+    "optee": "4fcbcd38704b593e961cd90910d9ca38fd72d2fb382819a17c77538776adbd53",
+    "fdt-1": "daf15b514e077a3dde7b4aabe67ad4f269a14fa3efbc39e1a720e7e7ef2b7568"
+  },
+  "features": [
+    "native RK3568 SATA2 through DWC AHCI and SCSI block layer",
+    "standard boot with SATA scan and bootflow",
+    "UEFI loader, UEFI boot manager, EFI variable file store",
+    "GPT, FAT, ext4, USB, MMC and network fallback",
+    "UART2 115200 8N1 and interactive TPI-LAZARUS prompt"
+  ]
+}

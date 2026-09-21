@@ -1,0 +1,182 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * TPI LAZARUS/UVON carrier with Forlinx FET3568-C SoM.
+ *
+ * Базовое описание SoM берётся из upstream RK3568 EVB: питание построено на
+ * том же RK809, eMMC подключён так же (8 бит, 200 МГц, non-removable).
+ * Специфика carrier'а перенесена из заводского kernel DTB платы.
+ */
+
+#include "rk3568-evb.dts"
+
+/ {
+	model = "TPI LAZARUS UVON";
+	compatible = "tpi,lazarus-uvon", "forlinx,fet3568-c", "rockchip,rk3568";
+
+	/*
+	 * Защищённая память проверенного Forlinx OP-TEE. Vendor U-Boot исключает
+	 * её из карты памяти; без этого ядро считает диапазон обычным RAM и
+	 * получает external abort от secure world.
+	 */
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		optee@8400000 {
+			reg = <0x0 0x08400000 0x0 0x01000000>;
+			no-map;
+		};
+	};
+
+	aliases {
+		sata0 = &sata2;
+		mmc2 = &sdmmc2;
+	};
+
+	chosen {
+		stdout-path = "serial2:115200n8";
+	};
+};
+
+&combphy2 {
+	/* LAZARUS native SATA connector */
+	status = "okay";
+};
+
+&sata2 {
+	status = "okay";
+};
+
+/*
+ * microSD carrier'а сидит на SDMMC2, мультиплекс m1: шина GPIO3_B1..B4,
+ * clk B6, cmd B5, детект B7. Значения взяты из заводского DTB платы.
+ * BootROM с этого контроллера не грузится, но U-Boot получает носитель
+ * для обновлений и восстановления.
+ */
+&sdmmc2 {
+	bus-width = <4>;
+	cap-sd-highspeed;
+	disable-wp;
+	max-frequency = <150000000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc2m1_bus4 &sdmmc2m1_clk &sdmmc2m1_cmd &sdmmc2m1_det>;
+	status = "okay";
+};
+
+/*
+ * Ethernet. Апстримный EVB не выводит опорные 25 МГц на PHY (CLK_MACx_OUT) и
+ * не задаёт задержки RGMII, из-за чего контроллер не выходит из сброса:
+ * "EQOS_DMA_MODE_SWR stuck ... FAILED: -110". Значения перенесены из
+ * заводского DT платы.
+ */
+&gmac0 {
+	assigned-clocks = <&cru SCLK_GMAC0_RX_TX>, <&cru SCLK_GMAC0>,
+			  <&cru CLK_MAC0_OUT>;
+	assigned-clock-parents = <&cru SCLK_GMAC0_RGMII_SPEED>;
+	assigned-clock-rates = <0>, <125000000>, <25000000>;
+	phy-mode = "rgmii-rxid";
+	tx_delay = <0x3e>;
+	rx_delay = <0x34>;
+
+	/*
+	 * Сброс PHY на carrier'е висит на GPIO0_D5, а не на выводе из
+	 * описания EVB. U-Boot ищет эту привязку именно в узле MAC
+	 * (dwc_eth_qos_rockchip.c). Пока PHY в сбросе, RX-клока нет и
+	 * сброс DMA контроллера не снимается.
+	 */
+	snps,reset-gpio = <&gpio0 RK_PD5 GPIO_ACTIVE_LOW>;
+	snps,reset-active-low;
+	snps,reset-delays-us = <0 20000 100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&gmac0_miim
+		     &gmac0_tx_bus2
+		     &gmac0_rx_bus2
+		     &gmac0_rgmii_clk
+		     &gmac0_rgmii_bus
+		     &eth0_pins>;
+	status = "okay";
+};
+
+&gmac1 {
+	assigned-clocks = <&cru SCLK_GMAC1_RX_TX>, <&cru SCLK_GMAC1>,
+			  <&cru CLK_MAC1_OUT>;
+	assigned-clock-parents = <&cru SCLK_GMAC1_RGMII_SPEED>;
+	assigned-clock-rates = <0>, <125000000>, <25000000>;
+	phy-mode = "rgmii-rxid";
+	tx_delay = <0x4d>;
+	rx_delay = <0x2d>;
+
+	/* Сброс PHY второго порта: GPIO1_B0. */
+	snps,reset-gpio = <&gpio1 RK_PB0 GPIO_ACTIVE_LOW>;
+	snps,reset-active-low;
+	snps,reset-delays-us = <0 20000 100000>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&gmac1m1_miim
+		     &gmac1m1_tx_bus2
+		     &gmac1m1_rx_bus2
+		     &gmac1m1_rgmii_clk
+		     &gmac1m1_rgmii_bus
+		     &eth1m1_pins>;
+	status = "okay";
+};
+
+/* Узлы PHY из EVB указывают чужой вывод сброса; приводим к разводке carrier'а. */
+&rgmii_phy0 {
+	reset-gpios = <&gpio0 RK_PD5 GPIO_ACTIVE_LOW>;
+};
+
+&rgmii_phy1 {
+	reset-gpios = <&gpio1 RK_PB0 GPIO_ACTIVE_LOW>;
+};
+
+/*
+ * Описание EVB содержит периферию, которой на carrier'е LAZARUS/UVON нет, и её
+ * выводы здесь заняты другими функциями. Сверено со схемой Э3:
+ *
+ *   GPIO0_A6 — PCIE30X2_CLKREQn_M0   (в EVB: включение питания USB host)
+ *   GPIO0_A5 — PCIE20_CLKREQn_M0     (в EVB: включение питания USB OTG)
+ *   GPIO0_C7 — UART0_CTSn            (в EVB: питание панели LCD0)
+ *   GPIO0_C5 — PCIE30X2_WAKEn_M0     (в EVB: питание панели LCD1)
+ *   GPIO0_C0 — UART0_RX              (в EVB: светодиод)
+ *   GPIO0_B5 — PCIE20_WAKEn_M0       (в EVB: прерывание тачскрина)
+ *   GPIO0_B6 — PCIE20_PERSTn_M0      (в EVB: сброс тачскрина)
+ *
+ * Питание USB на carrier'е не коммутируется: у заводского DT регуляторов для
+ * него нет вовсе. Оставляем регуляторы как постоянные источники, но без GPIO,
+ * иначе U-Boot удерживает PCIE30X2_CLKREQn_M0.
+ */
+&vcc5v0_usb_host {
+	/delete-property/ gpio;
+	/delete-property/ enable-active-high;
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
+	regulator-always-on;
+	regulator-boot-on;
+};
+
+&vcc5v0_usb_otg {
+	/delete-property/ gpio;
+	/delete-property/ enable-active-high;
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
+	regulator-always-on;
+	regulator-boot-on;
+};
+
+/* Панелей, тачскрина и светодиода EVB на этой плате нет. */
+&vcc3v3_lcd0_n {
+	status = "disabled";
+};
+
+&vcc3v3_lcd1_n {
+	status = "disabled";
+};
+
+&touchscreen0 {
+	status = "disabled";
+};
+
+&led_work {
+	status = "disabled";
+};

@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0+
+
+#include "rk3568-evb-u-boot.dtsi"
+
+/ {
+	chosen {
+		stdout-path = "serial2:115200n8";
+	};
+};

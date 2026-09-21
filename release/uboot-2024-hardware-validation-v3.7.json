@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "component": "TPI LAZARUS U-Boot 2024.04 SATA UEFI v3.7",
+  "recorded_utc": "2026-09-19T20:54:53Z",
+  "recorded_by": "TPI bring-up host (Dell Wyse 3040, Debian 13), UART 115200 8N1, driven remotely over Tailscale",
+  "result": "pass-installed-in-emmc-final",
+  "target": "Forlinx FET3568-C/C2 on LAZARUS/UVON carrier",
+  "deployment": {
+    "storage": "eMMC GPT partition uboot, LBA 16384, 8192 sectors",
+    "transport": "rockusb gadget provided by the build itself, driven remotely",
+    "image_sha256": "eab1e7bc9cb33094de70f3ed3f47b9df26e3d017f08fdd28da45b5a401ac8361",
+    "readback_sha256": "eab1e7bc9cb33094de70f3ed3f47b9df26e3d017f08fdd28da45b5a401ac8361",
+    "readback_byte_compare": "pass",
+    "layout": "two identical FIT copies at 0x000000 and 0x200000",
+    "replaced": "v3.6, sha256 20dbee4b179be724ee97c72183573fae103024856010c198e1040e44bf4434da, saved on the bring-up host before the write"
+  },
+  "pre_flight": {
+    "method": "loaded the chainload image from the SATA ext4 partition into RAM and jumped to it before touching eMMC",
+    "commands": [
+      "load scsi 0:1 0x10000000 tpi-v3.7-chainload.bin",
+      "cp.b 0x10000000 0x00a00000 ${filesize}",
+      "go 0x00a00000"
+    ],
+    "note": "loading straight to 0x00a00000 is refused with 'Reading file would overwrite reserved memory', so the image goes to a scratch address first",
+    "observed": "the new build printed its banner and carried the board through UEFI, GRUB 2.12 and Linux without writing anything to eMMC"
+  },
+  "boot_chain_observed": [
+    "Forlinx MiniLoader verified all nine FIT components, including optee at 0x08400000",
+    "TF-A BL31 v2.3 started OP-TEE 3.13.0 as BL32, 'Using opteed sec cpu_context!'",
+    "U-Boot 2024.04-tpi-lazarus-v3.7+ printed the TPI banner",
+    "MMC: mmc@fe000000: 2, mmc@fe2b0000: 1, mmc@fe310000: 0",
+    "AHCI 6 Gbps, SCSI Device 0: ATA P3-128 119.2 GB",
+    "UEFI boot manager loaded BOOTAA64.EFI from the SATA ESP, GRUB 2.12 started",
+    "Linux 5.10.160 reached userspace"
+  ],
+  "ethernet": {
+    "status": "works in U-Boot and in Linux",
+    "uboot": [
+      "ethernet@fe2a0000 (unconnected port) TIMEOUT, phy_startup() failed: -110, U-Boot falls back on its own",
+      "ethernet@fe010000 Waiting for PHY auto negotiation to complete....... done",
+      "DHCP client bound to address 192.168.10.36 (275 ms)"
+    ],
+    "linux": "eth1 up with a DHCP lease, board reachable over the LAN and over Tailscale"
+  },
+  "ums": {
+    "status": "works",
+    "command": "ums 0 mmc 0 at the TPI-LAZARUS=> prompt",
+    "observed": [
+      "host enumerated the board as a 29.1 GB USB disk, model 'UMS disk 0'",
+      "the host read the GPT over USB and listed all eight eMMC partitions with matching labels and sizes: uboot 4M, misc 4M, boot 64M, recovery 128M, backup 32M, rootfs 6G, oem 128M, userdata 22.8G",
+      "Ctrl+C returned the console and the USB disk disappeared"
+    ]
+  },
+  "verified_in_userspace": {
+    "memtotal_mb": 3905,
+    "tee_devices": "/dev/tee0 and /dev/teepriv0 present",
+    "sys_firmware_efi": "present",
+    "dmi_bios_version": "2024.04-tpi-lazarus-v3.7+",
+    "dmi_product_name": "TPI LAZARUS UVON",
+    "ethernet": "eth1 up, DHCP address 192.168.10.36, reachable"
+  },
+  "not_validated": [],
+  "rollback": "interrupt autoboot, run rockusb 0 mmc 0 and write a saved backup with rkdeveloptool write-partition uboot",
+  "changes_since_v3_6": [
+    "CONFIG_IDENT_STRING emptied: the U-Boot version line no longer repeats 'TPI LAZARUS / Tech Pro Industries LLC', which the banner underneath already carries",
+    "device tree model shortened to 'TPI LAZARUS UVON'; the SoM name stays in compatible and on the banner's SoC line, and Linux now reports that model as its DMI product name",
+    "the T, P and i of the TPI mark moved onto the front face of the ASCII cube; the top and right faces are left clean",
+    "build_fit.py carries the release version in a single VERSION constant, and the build directory and both vendor inputs can be pointed elsewhere with TPI_BUILD_DIR, TPI_VENDOR_UEFI_FIT and TPI_VENDOR_UBOOT_FIT; the SHA-256 checks on those inputs are unchanged"
+  ],
+  "verified_after_change": {
+    "note": "nothing outside the console strings and the device tree model property was touched, so the image differs from v3.7's predecessor only in BL33",
+    "checks": [
+      "version line reads 'U-Boot 2024.04-tpi-lazarus-v3.7+ (Sep 18 2026 - 23:45:33 +0000)' with no trailing identity string",
+      "'Model: TPI LAZARUS UVON' with no SoM suffix",
+      "banner cube prints '|   T P i  |  |' on its front face",
+      "scsi scan found the 119.2 GB disk, dhcp bound in 275 ms, ums exported all eight partitions",
+      "Linux reached userspace: MemTotal 3905 MB, /dev/tee0 present, EFI runtime present"
+    ]
+  }
+}

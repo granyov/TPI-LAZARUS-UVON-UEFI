@@ -1,0 +1,21 @@
+diff --git a/arch/arm/mach-rockchip/sdram.c b/arch/arm/mach-rockchip/sdram.c
+index 0d9a0aef..b63361ac 100644
+--- a/arch/arm/mach-rockchip/sdram.c
++++ b/arch/arm/mach-rockchip/sdram.c
+@@ -49,6 +49,16 @@ int dram_init_banksize(void)
+ 	if (ram_top > SZ_4G && top < SZ_4G) {
+ 		gd->bd->bi_dram[1].start = SZ_4G;
+ 		gd->bd->bi_dram[1].size = ram_top - gd->bd->bi_dram[1].start;
++	} else if (IS_ENABLED(CONFIG_ROCKCHIP_RK3568) &&
++		   ram_top >= SZ_4G && top < SZ_4G) {
++		/*
++		 * RK3568 leaves a peripheral hole below 4GB and mirrors the
++		 * tail of the DRAM into the upper window, so the remainder of
++		 * a 4 GiB device is reachable at SZ_4G + top, not at SZ_4G.
++		 * The vendor loader hands the same range to Linux.
++		 */
++		gd->bd->bi_dram[1].start = SZ_4G + top;
++		gd->bd->bi_dram[1].size = ram_top - top;
+ 	}
+ #else
+ #ifdef CONFIG_SPL_OPTEE_IMAGE

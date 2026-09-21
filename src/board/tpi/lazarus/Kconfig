@@ -1,0 +1,12 @@
+if TARGET_TPI_LAZARUS_RK3568
+
+config SYS_BOARD
+	default "lazarus"
+
+config SYS_VENDOR
+	default "tpi"
+
+config SYS_CONFIG_NAME
+	default "evb_rk3568"
+
+endif
