@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-VERSION = "v3.7"
+VERSION = "v3.9"
 
 ROOT = Path(__file__).resolve().parent
 SOURCE_TREE = ROOT / "u-boot"
@@ -98,7 +98,18 @@ def validate_inputs() -> tuple[bytes, dict[str, Path]]:
         b"TPI LAZARUS UVON",
         b"Tech Pro Industries LLC",
         b"TPI-LAZARUS=> ",
-        b"bootcmd=scsi scan; bootflow scan -lb",
+        b"bootcmd=run tpi_boot\0",
+        b"tpi_boot_order=scsi mmc0 mmc2 usb any\0",
+        b"tpi_boot_order:sw",
+        b"bootmenu_0=RKDevTool: LOADER mode",
+        b"bootmenu_3=USB mass storage: eMMC + SATA SSD",
+        b"tpi_after_loader=",
+        b"TPI LAZARUS UVON: LOADER",
+        b"rockusb 0 mmc 0; tpi_ctrlc_clear; run tpi_after_loader;",
+        b"ums 0 mmc,scsi 0,0; else",
+        b"fi; tpi_ctrlc_clear; env load\0",
+        b"a type per LUN: ums 0 mmc,scsi 0,0",
+        b"baudrate=1500000\0",
         b"/EFI/BOOT/BOOTAA64.EFI",
         b"ubootefi.var",
         b"dwc_ahci",
@@ -284,10 +295,15 @@ def main() -> None:
         "packed_component_sha256": packed_hashes,
         "features": [
             "native RK3568 SATA2 through DWC AHCI and SCSI block layer",
-            "standard boot with SATA scan and bootflow",
+            "boot order from tpi_boot_order (default: SATA, eMMC, microSD, USB, any device with UEFI boot manager)",
+            "environment on eMMC at 12 MiB, redundant copy at 12 MiB + 64 KiB; only tpi_boot_order is taken from it",
+            "RECOVERY key (SARADC channel 0) opens a menu: RKDevTool LOADER (default), service boot from microSD/USB, USB mass storage, boot order, MaskROM",
+            "USB mass storage exposes eMMC (LUN 0) and SATA (LUN 1) as 0525:a4a5 'TPI LAZARUS UVON: eMMC, SATA'; rockusb reset subcode 1 switches LOADER to mass storage without a reset, subcode 3 restarts into MaskROM",
+            "after mass storage the boot order is re-read from eMMC; Ctrl+C in LOADER or mass storage returns to the menu",
+            "rockusb reports bcdUSB 0x0201 with a USB 2.0 BOS, so RKDevTool and rkdeveloptool see a LOADER, and answers Read Flash Info",
             "UEFI loader, UEFI boot manager, EFI variable file store",
             "GPT, FAT, ext4, USB, MMC and network fallback",
-            "UART2 115200 8N1 and interactive TPI-LAZARUS prompt",
+            "UART2 1500000 8N1 and interactive TPI-LAZARUS prompt",
         ],
     }
     OUT_MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")

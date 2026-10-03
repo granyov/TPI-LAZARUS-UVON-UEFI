@@ -39,10 +39,15 @@ sudo apt-get install -y gcc-aarch64-linux-gnu build-essential bison flex \
 | `tpi-lazarus-rk3568_defconfig` | конфигурация платы |
 | `rk3568-tpi-lazarus.dts` | device tree платы |
 | `rk3568-tpi-lazarus-u-boot.dtsi` | U-Boot-специфичные дополнения DT |
-| `board/tpi/lazarus/` | board-файл с баннером загрузки |
+| `board/tpi/lazarus/` | board-файл: баннер загрузки, кнопка RECOVERY, USB ID режима флешки |
+| `board/tpi/lazarus/lazarus.env` | окружение по умолчанию: порядок загрузки, скрипты, меню Recovery |
+| `include/configs/tpi_lazarus_rk3568.h` | какие переменные U-Boot берёт из окружения на eMMC |
 | `dts-makefile.patch` | регистрация DTB в сборке |
 | `rk3568-board-target.patch` | объявление платы `TARGET_TPI_LAZARUS_RK3568` |
 | `rk3568-dram-high-bank.patch` | второй банк DRAM на `0x1f0000000` |
+| `rockusb-board-reset-flag.patch` | плата сама обрабатывает код сброса rockusb (переход LOADER → USB-диск без перезагрузки) |
+| `rockusb-loader-mode.patch` | RKDevTool и `rkdeveloptool` видят LOADER, а не MaskROM (`bcdUSB` 0x0201 и BOS для USB 2.0); ответ на «Read Flash Info» |
+| `ums-lun-devtypes.patch` | у каждого LUN `ums` свой тип носителя: `ums 0 mmc,scsi 0,0` — eMMC и SATA одним USB-устройством |
 | `pylibfdt-swig43.patch` | совместимость `pylibfdt` со SWIG 4.3 из Debian 13 |
 
 ## Порядок сборки
@@ -50,11 +55,12 @@ sudo apt-get install -y gcc-aarch64-linux-gnu build-essential bison flex \
 ```sh
 git clone --depth 1 --branch v2024.04 https://github.com/u-boot/u-boot u-boot
 cp src/tpi-lazarus-rk3568_defconfig u-boot/configs/
-cp src/rk3568-tpi-lazarus.dts tpi-src/rk3568-tpi-lazarus-u-boot.dtsi u-boot/arch/arm/dts/
+cp src/rk3568-tpi-lazarus.dts src/rk3568-tpi-lazarus-u-boot.dtsi u-boot/arch/arm/dts/
 cp -r src/board/tpi u-boot/board/
+cp src/include/configs/tpi_lazarus_rk3568.h u-boot/include/configs/
 (cd u-boot && git apply ../src/*.patch)
 
-export CROSS_COMPILE=aarch64-linux-gnu- SOURCE_DATE_EPOCH=1789775133
+export CROSS_COMPILE=aarch64-linux-gnu- SOURCE_DATE_EPOCH=1791056230
 make -C u-boot O=../build tpi-lazarus-rk3568_defconfig
 make -C u-boot O=../build -j"$(nproc)"
 ```
@@ -102,8 +108,11 @@ chainload-файл для проверки из оперативной памя�
 
 ## Воспроизводимость
 
-Опубликованные образы собраны `aarch64-linux-gnu-gcc 14.2.0` при
-`SOURCE_DATE_EPOCH=1789775133`. Другой компилятор даст другой BL33: контрольная
+Опубликованные образы собраны `aarch64-linux-gnu-gcc 14.2.0`: v3.9 — при
+`SOURCE_DATE_EPOCH=1791056230`, v3.8 — при `SOURCE_DATE_EPOCH=1790954718`,
+v3.7 — при `SOURCE_DATE_EPOCH=1789775133`.
+Повторная сборка v3.7 тем же компилятором совпала с опубликованной побайтно
+(BL33 и control DTB). Другой компилятор даст другой BL33: контрольная
 сборка тем же деревом, но `aarch64-elf-gcc 16.2.0`, отличалась по размеру.
 При этом **control DTB совпадает побайтно** — его компилирует встроенный в
 U-Boot dtc.

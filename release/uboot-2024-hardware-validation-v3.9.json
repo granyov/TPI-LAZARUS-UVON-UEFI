@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "component": "TPI LAZARUS U-Boot 2024.04 SATA UEFI v3.9",
+  "recorded_utc": "2026-10-03T19:57:38Z",
+  "recorded_by": "TPI bring-up host (Dell Wyse 3040, Debian 13): board UART at 1500000 8N1 through a CH343 adapter, board USB-C OTG on the same host, driven remotely over Tailscale",
+  "result": "pass-installed-in-emmc-final",
+  "target": "Forlinx FET3568-C/C2 on LAZARUS/UVON carrier",
+  "deployment": {
+    "storage": "eMMC loader area, sectors 0-24575 (12 MiB): Forlinx MiniLoader at LBA 64, FIT at LBA 16384",
+    "transport": "the board's own USB mass storage: the PC tool switched the board from LOADER with rockusb reset subcode 1, then tpi-uvon wrote the 12 MiB loader area to the eMMC LUN and verified it",
+    "image_sha256": "fa2191b350cfb3b252b384ca81e3f38ce5799879c922551aa07e4fd02f7959ee",
+    "loader_area_sha256": "d1fe0bbdf1c7057dd4fda5125aea97b6bd8a553197f3f17836e91b2574032a54",
+    "readback_sha256": "fa2191b350cfb3b252b384ca81e3f38ce5799879c922551aa07e4fd02f7959ee",
+    "readback_byte_compare": "pass",
+    "replaced": "v3.9-pre2 (FIT edc7d8b05e0133f75a52de7078047efa0ec1f6fed577c7283804064d3028d02d, installed earlier the same day over v3.7 eab1e7bc9cb33094de70f3ed3f47b9df26e3d017f08fdd28da45b5a401ac8361); both saved before being overwritten"
+  },
+  "pre_flight": {
+    "method": "loaded the chainload image from the FAT ESP of the eMMC into RAM and jumped to it before touching the loader area",
+    "commands": [
+      "load mmc 0:1 0x10000000 /tpi-v39c-chain.bin",
+      "cp.b 0x10000000 0x00a00000 ${filesize}",
+      "go 0x00a00000"
+    ],
+    "observed": "the new build printed its banner (Oct 03 2026 - 19:37:10), loaded the environment from eMMC and carried out every check below before the eMMC write"
+  },
+  "boot_chain_observed": [
+    "cold boot after a power cut: U-Boot 2024.04-tpi-lazarus-v3.9+ (Oct 03 2026 - 19:37:10 +0000) from eMMC",
+    "Loading Environment from MMC... OK; the banner showed the boot order saved by the PC tool",
+    "bootflow mmc0 found efi/boot/bootaa64.efi on the eMMC ESP, GRUB 2.12 started Astra Linux 4.7.11 (kernel 6.1.170)",
+    "Linux reached the login prompt on ttyS2 at 1500000"
+  ],
+  "console": {
+    "status": "works",
+    "observed": "U-Boot and Linux at 1500000 8N1 on the CH343 without errors; MiniLoader, TF-A and OP-TEE still print at 115200 and show as a few lines of noise"
+  },
+  "recovery_key": {
+    "status": "works",
+    "observed": [
+      "SARADC channel 0 reads 1023 released",
+      "held at power-on: 'RECOVERY pressed: opening the recovery menu'",
+      "with no choice the 5 s countdown started LOADER"
+    ]
+  },
+  "recovery_menu": {
+    "status": "works",
+    "observed": [
+      "'Boot order: eMMC first' saved the environment ('Saving Environment to MMC... Writing to MMC(0)... OK') and the menu came back",
+      "'Continue normal boot' then booted eMMC first",
+      "Ctrl+C in LOADER returned to the menu"
+    ]
+  },
+  "loader": {
+    "status": "works",
+    "observed": [
+      "host saw 2207:350a 'TPI LAZARUS UVON: LOADER' with the board serial derived from the CPU ID, bcdUSB 2.01 with a BOS holding the USB 2.0 extension, LPM not supported",
+      "rkdeveloptool ld: Loader",
+      "rkdeveloptool rfi: 29840 MB, 61112320 sectors",
+      "rkdeveloptool rl 64: RKNS idblock header"
+    ]
+  },
+  "ums": {
+    "status": "works",
+    "observed": [
+      "rockusb reset subcode 1 from the PC tool switched LOADER to mass storage without a reset",
+      "host saw 0525:a4a5 'TPI LAZARUS UVON: eMMC, SATA' with LUN 0 eMMC 29.1 GiB and LUN 1 SATA 119.2 GiB",
+      "tpi-uvon on the host recognised the board by its serial, the OS on each disk and the saved boot order",
+      "eject ended mass storage; the board re-read the environment ('Loading Environment from MMC... OK') and booted in the order just written by the PC ('TPI: boot from microSD', then eMMC)"
+    ]
+  },
+  "environment": {
+    "status": "works",
+    "observed": [
+      "redundant 64 KiB copies at 12 MiB and 12 MiB + 64 KiB",
+      "fw_printenv from libubootenv with a two-line config read tpi_boot_order written by tpi-uvon",
+      "written by tpi-uvon on the board and on the PC, and by saveenv from the menu"
+    ]
+  },
+  "verified_in_userspace": [
+    "Astra Linux 4.7.11 from eMMC: Ethernet with a DHCP lease, RTC HYM8563, RS-485 ports ttyUSB0-7 present, OP-TEE region 0x08400000-0x093fffff reserved"
+  ],
+  "not_validated": [
+    "RKDevTool on Windows; the LOADER protocol was checked with rkdeveloptool only",
+    "MaskROM menu entry and rockusb reset subcode 3",
+    "booting service media from microSD or USB: none was inserted, only the microSD attempt was observed",
+    "Debian on SATA under v3.9: its kernel console is still 115200"
+  ],
+  "rollback": "tpi-uvon firmware --file <backup> from Linux on the board, or the PC window over USB; backups of v3.9-pre2 and v3.7 are kept by tpi-uvon in /var/lib/tpi-uvon/firmware-backups",
+  "changes_since_v3_7": [
+    "v3.8 (not released on its own): fixed boot order, SATA first, then eMMC, then any device",
+    "boot order configurable as tpi_boot_order and kept in the U-Boot environment on eMMC; only this variable is taken from storage",
+    "RECOVERY key opens a menu: RKDevTool LOADER (default after 5 s), service boot from microSD or USB, USB mass storage, normal boot, boot order, MaskROM",
+    "USB mass storage with eMMC and SATA as one device (patch ums-lun-devtypes), boot order re-read afterwards",
+    "LOADER switched to mass storage from the PC by rockusb reset subcode 1 (patch rockusb-board-reset-flag)",
+    "rockusb seen as a LOADER by RKDevTool and rkdeveloptool, Read Flash Info answered (patch rockusb-loader-mode)",
+    "console at 1500000 8N1"
+  ]
+}

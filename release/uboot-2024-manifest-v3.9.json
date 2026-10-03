@@ -1,0 +1,63 @@
+{
+  "schema": 2,
+  "product": "TPI LAZARUS/UVON U-Boot 2024.04 SATA UEFI",
+  "vendor": "Tech Pro Industries LLC (TPI)",
+  "generated_utc": "2026-10-03T19:56:55.704822+00:00",
+  "deployment_status": "built-and-statically-verified; hardware-test-required-before-emmc",
+  "architecture": {
+    "unchanged": [
+      "BootROM",
+      "Forlinx DDR/early loader",
+      "Forlinx SPL",
+      "Forlinx TF-A BL31 payloads"
+    ],
+    "replaced": "BL33 and its U-Boot control DTB",
+    "bl33_load_entry": "0x00a00000"
+  },
+  "upstream": {
+    "project": "https://github.com/u-boot/u-boot",
+    "tag": "v2024.04",
+    "commit": "25049ad560826f7dc1c4740883b0016014a59789",
+    "defconfig_sha256": "05276132410179d1ddc855bddc2705f1433f43fc8cb99d25dc7ee5d2b0bc17ae"
+  },
+  "inputs": {
+    "vendor_fit_sha256": "dc2ba2ee4d1dca09dd2e5dd307a2f4609a7c2e477ad714ba20a5192b3e20e462",
+    "bl33_sha256": "6e7cb8ae670d37a573123bfa74b21173cc2cd34bc17a1f2655b39b99ce242d55",
+    "control_dtb_sha256": "8d18d68a8c6a56a1aa271c5297361e3ae77b767bde5864bfe76d36b557bc1bd9"
+  },
+  "outputs": {
+    "fit": {
+      "file": "TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.9.img",
+      "size": 4194304,
+      "sha256": "fa2191b350cfb3b252b384ca81e3f38ce5799879c922551aa07e4fd02f7959ee"
+    },
+    "chainload": {
+      "file": "TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.9-chainload.bin",
+      "size": 977752,
+      "sha256": "204afc0b34d87f922c5b2ef31180ab6baa6d849529efa2124bd8960ebc4233af"
+    }
+  },
+  "packed_component_sha256": {
+    "u-boot": "6e7cb8ae670d37a573123bfa74b21173cc2cd34bc17a1f2655b39b99ce242d55",
+    "atf-1": "b5946ac63df8fb3569407a75cf2f6aa396551ba011e1a84bec654dc9982ba063",
+    "atf-2": "a9a1e63bef11a6776a9670708fe78211ddcc437cc4ab145e1cfef77cea8607e4",
+    "atf-3": "2f91089eb714c78d9fb81f005859beda7f1709e04a858e4db732cb8f9800e727",
+    "atf-4": "b8dca786b41f8beb12e2434c1698e344931777099aa0e5729b76fcda2f781907",
+    "atf-5": "86ef8857484c5cd51363c3dd8338818c7bdc687e48c57897578781f10270a515",
+    "atf-6": "0b2b146c608fb46195852ab008f179c3e4ea399d38af589691d72705fbfde654",
+    "optee": "4fcbcd38704b593e961cd90910d9ca38fd72d2fb382819a17c77538776adbd53",
+    "fdt-1": "8d18d68a8c6a56a1aa271c5297361e3ae77b767bde5864bfe76d36b557bc1bd9"
+  },
+  "features": [
+    "native RK3568 SATA2 through DWC AHCI and SCSI block layer",
+    "boot order from tpi_boot_order (default: SATA, eMMC, microSD, USB, any device with UEFI boot manager)",
+    "environment on eMMC at 12 MiB, redundant copy at 12 MiB + 64 KiB; only tpi_boot_order is taken from it",
+    "RECOVERY key (SARADC channel 0) opens a menu: RKDevTool LOADER (default), service boot from microSD/USB, USB mass storage, boot order, MaskROM",
+    "USB mass storage exposes eMMC (LUN 0) and SATA (LUN 1) as 0525:a4a5 'TPI LAZARUS UVON: eMMC, SATA'; rockusb reset subcode 1 switches LOADER to mass storage without a reset, subcode 3 restarts into MaskROM",
+    "after mass storage the boot order is re-read from eMMC; Ctrl+C in LOADER or mass storage returns to the menu",
+    "rockusb reports bcdUSB 0x0201 with a USB 2.0 BOS, so RKDevTool and rkdeveloptool see a LOADER, and answers Read Flash Info",
+    "UEFI loader, UEFI boot manager, EFI variable file store",
+    "GPT, FAT, ext4, USB, MMC and network fallback",
+    "UART2 1500000 8N1 and interactive TPI-LAZARUS prompt"
+  ]
+}

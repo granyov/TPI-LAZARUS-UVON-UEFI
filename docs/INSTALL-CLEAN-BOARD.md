@@ -11,12 +11,12 @@ U-Boot 2017.09 от Forlinx или с более старой нашей вер�
 
 | | |
 |---|---|
-| Файл | `TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.7.img` из релиза [`v3.7`](../../releases/tag/v3.7) |
+| Файл | `TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.9.img` из релиза `v3.9` закрытого репозитория `TPI-LAZARUS-UVON-Bootchain` или собранный по [`BUILD.md`](BUILD.md) |
 | Кабель | USB к разъёму OTG платы |
-| Консоль | последовательный порт, 115200 8N1 |
+| Консоль | последовательный порт, 1 500 000 8N1 (TPI до v3.8 — 115200) |
 | Утилита | `rkdeveloptool` на хосте |
 
-SHA-256 образа — `eab1e7bc9cb33094de70f3ed3f47b9df26e3d017f08fdd28da45b5a401ac8361`,
+SHA-256 образа — `fa2191b350cfb3b252b384ca81e3f38ce5799879c922551aa07e4fd02f7959ee`,
 размер ровно 4194304 байта. Проверьте перед записью:
 
 ```sh
@@ -44,6 +44,9 @@ rkdeveloptool ld                          # плата должна опреде
 | Заводская Forlinx 2017.09 | **только CTRL+C** |
 | TPI v3.x | любой клавишей |
 
+На TPI v3.9 консоль не обязательна: удержите RECOVERY при включении, и через
+5 секунд меню само включит LOADER — то же, что `rockusb 0 mmc 0`.
+
 Если попали в меню Rockchip, пункт `0` — выход в консоль. В приглашении:
 
 ```text
@@ -57,12 +60,13 @@ rkdeveloptool ld                          # плата должна опреде
 
 ```sh
 rkdeveloptool ld
-# DevNo=1  Vid=0x2207,Pid=0x350a,LocationID=102  Maskrom
+# DevNo=1  Vid=0x2207,Pid=0x350a,LocationID=102  Loader
 ```
 
-Слово `Maskrom` в выводе — не ошибка: дескрипторы нашего гаджета отличаются от
-заводского загрузчика, и утилита определяет режим так. На работу с разделами
-это не влияет; не работает только `read-capability`.
+Заводской U-Boot и TPI до v3.8 определяются как `Maskrom`: утилита смотрит на
+поле `bcdUSB` дескриптора, а их гаджет его не выставляет. На работу с
+разделами это не влияет; не работает только `read-capability`. С v3.9 плата
+представляется как `Loader` и отвечает на `rkdeveloptool rfi`.
 
 ## Шаг 2. Снять резервную копию
 
@@ -77,9 +81,9 @@ sha256sum uboot-backup-*.img
 ## Шаг 3. Записать и сверить
 
 ```sh
-rkdeveloptool write-partition uboot TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.7.img
+rkdeveloptool write-partition uboot TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.9.img
 rkdeveloptool read-partition  uboot readback.img
-cmp readback.img TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.7.img && echo "совпадает побайтно"
+cmp readback.img TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.9.img && echo "совпадает побайтно"
 rkdeveloptool rd
 ```
 
@@ -91,30 +95,38 @@ rkdeveloptool rd
 После сброса в консоли должно появиться:
 
 ```text
-## Checking u-boot 0x00a00000 ... sha256(dd92931990...) + OK
+## Checking u-boot 0x00a00000 ... sha256(6e7cb8ae67...) + OK
 ## Checking optee  0x08400000 ... sha256(4fcbcd3870...) + OK
 INFO:    Using opteed sec cpu_context!
 I/TC: OP-TEE version: 3.13.0-723-gdcfdd61d0
-U-Boot 2024.04-tpi-lazarus-v3.7+ (Sep 18 2026 - 23:45:33 +0000)
+U-Boot 2024.04-tpi-lazarus-v3.9+ (Oct 03 2026 - 19:37:10 +0000)
 Model: TPI LAZARUS UVON
-
+…
+Loading Environment from MMC... *** Warning - bad CRC, using default environment
+…
        ___________
       /          /|     TPI LAZARUS UVON
      /          / |     Tech Pro Industries LLC
     /__________/  |
-    |          |  |     Bootloader: 2024.04-tpi-lazarus-v3.7+
+    |          |  |     Bootloader: 2024.04-tpi-lazarus-v3.9+
     |   T P i  |  |     SoC:        RK3568 / Forlinx FET3568-C
-    |          | /
-    |__________|/
+    |          | /      Boot order: scsi mmc0 mmc2 usb any
+    |__________|/       Recovery:   hold RECOVERY at power-on
 ```
+
+Строки до `U-Boot 2024.04` печатают заводские MiniLoader, TF-A и OP-TEE, и
+идут они на 115200: на 1 500 000 это мусор, а прочитать их можно, переключив
+терминал на 115200. `bad CRC` при первом запуске — норма: сохранённых настроек
+на eMMC ещё нет, действует порядок загрузки по умолчанию.
 
 Строки `## Checking … + OK` печатает заводской MiniLoader: он сверяет SHA-256
 каждого компонента FIT до передачи управления. Отсутствие строки
 `Error initializing runtime service opteed_fast` означает, что OP-TEE на месте.
 
-Дальше загрузчик ищет систему: `scsi scan` находит SATA, `bootflow scan`
-передаёт управление UEFI. **Без установленной ОС он остановится на приглашении
-`TPI-LAZARUS=> ` — это нормально**, прошивка своё дело сделала.
+Дальше загрузчик ищет систему по порядку `tpi_boot_order`: SATA, eMMC,
+microSD, USB, затем любой носитель через UEFI. **Без установленной ОС он
+остановится на приглашении `TPI-LAZARUS=> ` — это нормально**, прошивка своё
+дело сделала.
 
 Что именно ищет загрузчик и что нужно подготовить на носителе, чтобы он нашёл
 систему, описано в [`docs/UEFI.md`](UEFI.md).
@@ -140,10 +152,11 @@ rkdeveloptool rd
 идентичные копии FIT — на `0x0` и `0x200000` — это штатная избыточность
 Rockchip, воспроизводящая заводскую раскладку.
 
-Если и это не помогает, на carrier'е есть цепь `RECOVERY_KEY`: по схеме Э3 она
-идёт через NX7002AK на вывод SoM `ADC_VIN0_KEY/RECOVERY`. Удержание её при
-подаче питания вводит загрузчик Rockchip в режим загрузки по USB. Где именно
-выведена сама кнопка на конкретном исполнении корпуса — смотрите по
+Кнопка RECOVERY (цепь `RECOVERY_KEY`, по схеме Э3 через NX7002AK на вывод SoM
+`ADC_VIN0_KEY/RECOVERY`) с v3.9 обрабатывается самой прошивкой: удержание при
+подаче питания открывает меню Recovery, без выбора через 5 секунд включается
+LOADER (см. [`UEFI.md`](UEFI.md)). В меню есть и перезапуск в MaskROM. Где
+именно выведена кнопка на конкретном исполнении корпуса — смотрите по
 конструкторской документации изделия.
 
 Аппаратный MaskROM (замыкание линий eMMC, чтобы BootROM не смог прочитать
@@ -153,11 +166,11 @@ Rockchip, воспроизводящая заводскую раскладку.
 ## Необязательно: проверка из оперативной памяти
 
 Если хочется убедиться в образе, не трогая eMMC, положите chainload-файл
-`TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.7-chainload.bin` туда, откуда его
+`TPI-LAZARUS-U-Boot-2024.04-SATA-UEFI-v3.9-chainload.bin` туда, откуда его
 прочитает загрузчик, и запустите:
 
 ```text
-=> load scsi 0:1 0x10000000 tpi-v3.7-chainload.bin
+=> load scsi 0:1 0x10000000 tpi-v3.9-chainload.bin
 => cp.b 0x10000000 0x00a00000 ${filesize}
 => go 0x00a00000
 ```

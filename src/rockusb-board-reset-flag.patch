@@ -1,0 +1,33 @@
+diff --git a/drivers/usb/gadget/f_rockusb.c b/drivers/usb/gadget/f_rockusb.c
+index 98a7ffa2..85c51c73 100644
+--- a/drivers/usb/gadget/f_rockusb.c
++++ b/drivers/usb/gadget/f_rockusb.c
+@@ -743,18 +743,26 @@ static void cb_erase_lba(struct usb_ep *ep, struct usb_request *req)
+ 			     USB_BULK_CS_WRAP_LEN);
+ }
+ 
+-void __weak rkusb_set_reboot_flag(int flag)
++/*
++ * Returns non-zero when the board handled the flag itself and no reset is
++ * wanted, e.g. it leaves rockusb to start another USB function instead.
++ */
++int __weak rkusb_set_reboot_flag(int flag)
+ {
+ 	struct f_rockusb *f_rkusb = get_rkusb();
+ 
+ 	printf("rockkusb set reboot flag: %d\n", f_rkusb->reboot_flag);
++	return 0;
+ }
+ 
+ static void compl_do_reset(struct usb_ep *ep, struct usb_request *req)
+ {
+ 	struct f_rockusb *f_rkusb = get_rkusb();
+ 
+-	rkusb_set_reboot_flag(f_rkusb->reboot_flag);
++	if (rkusb_set_reboot_flag(f_rkusb->reboot_flag)) {
++		req->complete = rockusb_complete;
++		return;
++	}
+ 	do_reset(NULL, 0, 0, NULL);
+ }
+ 

@@ -7,6 +7,6 @@ config SYS_VENDOR
 	default "tpi"
 
 config SYS_CONFIG_NAME
-	default "evb_rk3568"
+	default "tpi_lazarus_rk3568"
 
 endif

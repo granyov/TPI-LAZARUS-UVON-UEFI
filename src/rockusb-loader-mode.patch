@@ -1,0 +1,113 @@
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -846,7 +846,30 @@
+ 	}
+ 	return le16_to_cpu(bos->wTotalLength);
+ }
++
++/*
++ * BOS of a USB 2.01 device at high speed: the USB 2.0 extension only, LPM
++ * not supported. Rockchip loaders report bcdUSB 0x0201 (that is how the PC
++ * tools tell a loader from MaskROM), and hosts ask such a device for its BOS.
++ */
++static int usb2_bos_desc(struct usb_composite_dev *cdev)
++{
++	struct usb_bos_descriptor *bos = cdev->req->buf;
++	struct usb_ext_cap_descriptor *usb_ext = cdev->req->buf + USB_DT_BOS_SIZE;
+ 
++	bos->bLength = USB_DT_BOS_SIZE;
++	bos->bDescriptorType = USB_DT_BOS;
++	bos->wTotalLength = cpu_to_le16(USB_DT_BOS_SIZE + USB_DT_USB_EXT_CAP_SIZE);
++	bos->bNumDeviceCaps = 1;
++
++	usb_ext->bLength = USB_DT_USB_EXT_CAP_SIZE;
++	usb_ext->bDescriptorType = USB_DT_DEVICE_CAPABILITY;
++	usb_ext->bDevCapabilityType = USB_CAP_TYPE_EXT;
++	usb_ext->bmAttributes = 0;
++
++	return le16_to_cpu(bos->wTotalLength);
++}
++
+ static int count_ext_compat(struct usb_configuration *c)
+ {
+ 	int i, res;
+@@ -1050,7 +1073,8 @@
+ 			if (gadget->speed >= USB_SPEED_SUPER) {
+ 				cdev->desc.bcdUSB = cpu_to_le16(0x0310);
+ 				cdev->desc.bMaxPacketSize0 = 9;
+-			} else {
++			} else if (le16_to_cpu(cdev->desc.bcdUSB) >= 0x0300) {
++				/* the gadget's own 0x0201 stays */
+ 				cdev->desc.bcdUSB = cpu_to_le16(0x0200);
+ 			}
+ 			value = min(w_length, (u16) sizeof cdev->desc);
+@@ -1090,6 +1114,9 @@
+ 			if (gadget->speed >= USB_SPEED_SUPER) {
+ 				value = bos_desc(cdev);
+ 				value = min(w_length, (u16)value);
++			} else if (le16_to_cpu(cdev->desc.bcdUSB) >= 0x0201) {
++				value = usb2_bos_desc(cdev);
++				value = min(w_length, (u16)value);
+ 			}
+ 			break;
+ 		default:
+diff --git a/drivers/usb/gadget/f_rockusb.c b/drivers/usb/gadget/f_rockusb.c
+--- a/drivers/usb/gadget/f_rockusb.c
++++ b/drivers/usb/gadget/f_rockusb.c
+@@ -615,7 +615,46 @@
+ 
+ 	rockusb_tx_write((char *)chip_info, sizeof(chip_info));
+ }
++
++/* Flash info as Rockchip loaders report it; sizes are in 512-byte sectors */
++struct rk_flash_info {
++	u32	flash_size;
++	u16	block_size;
++	u8	page_size;
++	u8	ecc_bits;
++	u8	access_time;
++	u8	manufacturer;
++	u8	flash_mask;
++} __packed;
+ 
++static void cb_read_flash_info(struct usb_ep *ep, struct usb_request *req)
++{
++	ALLOC_CACHE_ALIGN_BUFFER(struct fsg_bulk_cb_wrap, cbw,
++				 sizeof(struct fsg_bulk_cb_wrap));
++	struct f_rockusb *f_rkusb = get_rkusb();
++	struct rk_flash_info finfo = {
++		.block_size = 1024,
++		.page_size = 4,
++		.access_time = 40,
++	};
++
++	memcpy((char *)cbw, req->buf, USB_BULK_CB_WRAP_LEN);
++
++	if (!f_rkusb->desc)
++		f_rkusb->desc = blk_get_dev(f_rkusb->dev_type,
++					    f_rkusb->dev_index);
++	if (f_rkusb->desc && f_rkusb->desc->type != DEV_TYPE_UNKNOWN) {
++		finfo.flash_size = (u32)f_rkusb->desc->lba;
++		finfo.flash_mask = 1;
++	}
++
++	/* Prepare for sending subsequent CSW_GOOD */
++	f_rkusb->tag = cbw->tag;
++	f_rkusb->in_req->complete = tx_handler_send_csw;
++
++	rockusb_tx_write((char *)&finfo, sizeof(finfo));
++}
++
+ static void cb_read_lba(struct usb_ep *ep, struct usb_request *req)
+ {
+ 	ALLOC_CACHE_ALIGN_BUFFER(struct fsg_bulk_cb_wrap, cbw,
+@@ -860,7 +899,7 @@
+ 	},
+ 	{
+ 		.cmd = K_FW_READ_FLASH_INFO,
+-		.cb = cb_not_support,
++		.cb = cb_read_flash_info,
+ 	},
+ 	{
+ 		.cmd = K_FW_GET_CHIP_VER,
